@@ -46,7 +46,9 @@
     </footer>
 
     <script>
-    // Fetch activities, render cards with participants, populate select, and handle signup
+    // make activities available globally for the signup handler
+    let activitiesData = {};
+
     async function fetchActivities() {
       const res = await fetch('/activities');
       if (!res.ok) {
@@ -73,7 +75,9 @@
       sched.innerHTML = `<strong>Schedule:</strong> ${data.schedule}`;
       card.appendChild(sched);
 
+      // add an id to the capacity paragraph for reliable updates
       const cap = document.createElement('p');
+      cap.id = `capacity-${cssSafeId(name)}`;
       cap.innerHTML = `<strong>Capacity:</strong> ${data.participants.length} / ${data.max_participants}`;
       card.appendChild(cap);
 
@@ -116,7 +120,7 @@
     }
 
     async function init() {
-      const activities = await fetchActivities();
+      activitiesData = await fetchActivities(); // assign to global
       const list = document.getElementById('activities-list');
       list.innerHTML = '';
 
@@ -124,7 +128,7 @@
       // Clear existing options except placeholder
       select.querySelectorAll('option:not([value=""])').forEach(o => o.remove());
 
-      Object.entries(activities).forEach(([name, data]) => {
+      Object.entries(activitiesData).forEach(([name, data]) => {
         const card = createActivityCard(name, data);
         list.appendChild(card);
 
@@ -158,7 +162,7 @@
 
         showMessage(data.message || 'Signed up successfully', 'success');
 
-        // Update participants list and capacity on the card
+        // Update participants list and capacity on the card using stable ids
         const ul = document.getElementById(`participants-${cssSafeId(activity)}`);
         if (ul) {
           ul.innerHTML = '';
@@ -167,12 +171,16 @@
             li.textContent = p;
             ul.appendChild(li);
           });
-          // Update capacity text
-          const capP = document.querySelector(`#activity-${cssSafeId(activity)} p:nth-of-type(3)`);
+          // Update capacity text using the capacity id
+          const capP = document.getElementById(`capacity-${cssSafeId(activity)}`);
           if (capP) {
-            capP.innerHTML = `<strong>Capacity:</strong> ${data.participants.length} / ${activities[activity].max_participants || ''}`;
+            const max = activitiesData[activity] ? activitiesData[activity].max_participants : '';
+            capP.innerHTML = `<strong>Capacity:</strong> ${data.participants.length} / ${max}`;
           }
         }
+
+        // keep local copy in sync
+        if (activitiesData[activity]) activitiesData[activity].participants = data.participants || [];
       } catch (err) {
         showMessage('Network error during signup', 'error');
       }
